@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sintetizador de Vogais LPC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e11;
+    --surface: #17171c;
+    --surface2: #1f1f27;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e8f0;
+    --text2: #8888a0;
+    --text3: #55556a;
+    --accent: #7f77dd;
+    --accent-light: #afa9ec;
+    --accent-dim: rgba(127,119,221,0.15);
+    --green: #1d9e75;
+    --coral: #d85a30;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .container {
+    max-width: 780px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: .02em;
+    color: var(--text);
+  }
+
+  header span {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+  }
+
+  .card-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text3);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: .85rem;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  @media (max-width: 560px) { .two-col { grid-template-columns: 1fr; } }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: .55rem;
+  }
+
+  .row label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+    min-width: 80px;
+  }
+
+  .row .val {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-light);
+    min-width: 54px;
+    text-align: right;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 2px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  input[type=range]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+  }
+
+  .divider {
+    border: none;
+    border-top: 0.5px solid var(--border);
+    margin: .6rem 0;
+  }
+
+  .vowels {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .vbtn {
+    padding: 5px 13px;
+    border-radius: 6px;
+    border: 0.5px solid var(--border2);
+    background: transparent;
+    color: var(--text2);
+    font-family: var(--mono);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .vbtn:hover { background: var(--surface2); color: var(--text); }
+
+  .vbtn.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent-light);
+  }
+
+  canvas { display: block; }
+
+  #spectrum {
+    width: 100%;
+    height: 110px;
+    border-radius: 6px;
+    background: var(--surface2);
+  }
+
+  #vowel-space {
+    width: 100%;
+    height: 210px;
+    cursor: crosshair;
+  }
+
+  .vs-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 5px;
+  }
+
+  .play-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 22px;
+    border-radius: 8px;
+    border: 0.5px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .play-btn:hover { background: var(--surface2); }
+
+  .play-btn.playing {
+    background: rgba(29,158,117,.15);
+    border-color: var(--green);
+    color: #5dcaa5;
+  }
+
+  .play-icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>sintetizador-vogais-lpc</h1>
+    <span>trem de pulsos + filtro de ressonâncias</span>
+  </header>
+
+  <div class="card">
+    <div class="card-title">Vogais predefinidas</div>
+    <div class="vowels" id="vowel-btns"></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Fonte sonora</div>
+      <div class="row">
+        <label>f₀</label>
+        <input type="range" id="f0" min="60" max="300" value="120" step="1">
+        <span class="val" id="f0-val">120 Hz</span>
+      </div>
+      <div class="row">
+        <label>Jitter</label>
+        <input type="range" id="jitter" min="0" max="5" value="0.5" step="0.1">
+        <span class="val" id="jitter-val">0.5%</span>
+      </div>
+      <div class="row">
+        <label>Shimmer</label>
+        <input type="range" id="shimmer" min="0" max="10" value="1" step="0.1">
+        <span class="val" id="shimmer-val">1.0%</span>
+      </div>
+      <div class="row">
+        <label>Aspiração</label>
+        <input type="range" id="noise" min="0" max="100" value="5" step="1">
+        <span class="val" id="noise-val">5%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Espaço vocálico F1 × F2</div>
+      <canvas id="vowel-space"></canvas>
+      <div class="vs-hint">clique ou arraste para definir F1 e F2</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Formantes</div>
+    <div class="row">
+      <label>F1</label>
+      <input type="range" id="f1" min="200" max="1000" value="800" step="10">
+      <span class="val" id="f1-val">800 Hz</span>
+    </div>
+    <div class="row">
+      <label>F1 BW</label>
+      <input type="range" id="bw1" min="30" max="200" value="80" step="5">
+      <span class="val" id="bw1-val">80 Hz</span>
+    </div>
+    <hr class="divider">
+    <div class="row">
+      <label>F2</label>
+      <input type="range" id="f2" min="500" max="3000" value="1200" step="10">
+      <span class="val" id="f2-val">1200 Hz</span>
+    </div>
+    <div class="row">
+      <label>F2 BW</label>
+      <input type="range" id="bw2" min="30" max="200" value="100" step="5">
+      <span class="val" id="bw2-val">100 Hz</span>
+    </div>
+    <hr class="divider">
+    <div class="row">
+      <label>F3</label>
+      <input type="range" id="f3" min="1500" max="4000" value="2500" step="10">
+      <span class="val" id="f3-val">2500 Hz</span>
+    </div>
+    <div class="row">
+      <label>F3 BW</label>
+      <input type="range" id="bw3" min="30" max="200" value="120" step="5">
+      <span class="val" id="bw3-val">120 Hz</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Espectro em tempo real</div>
+    <canvas id="spectrum"></canvas>
+  </div>
+
+  <div class="bottom-row">
+    <button class="play-btn" id="play-btn">
+      <span class="play-icon" id="play-icon">
+        <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor"><polygon points="0,0 12,7 0,14"/></svg>
+      </span>
+      <span id="play-label">tocar</span>
+    </button>
+    <span class="hint">Web Audio API · bandpass filters · pulse train source</span>
+  </div>
+
+</div>
+<script>
+const VOWELS = [
+  {label:'/a/', f1:800, f2:1200, f3:2500, bw1:80,  bw2:100, bw3:120},
+  {label:'/ɛ/', f1:600, f2:1800, f3:2600, bw1:75,  bw2:95,  bw3:115},
+  {label:'/e/', f1:500, f2:1900, f3:2600, bw1:70,  bw2:90,  bw3:110},
+  {label:'/i/', f1:300, f2:2300, f3:3000, bw1:60,  bw2:80,  bw3:100},
+  {label:'/ɔ/', f1:600, f2:900,  f3:2500, bw1:80,  bw2:110, bw3:130},
+  {label:'/o/', f1:500, f2:900,  f3:2500, bw1:80,  bw2:110, bw3:130},
+  {label:'/u/', f1:300, f2:800,  f3:2300, bw1:70,  bw2:100, bw3:120},
+];
+
+// Quadrilátero IPA: vértices são as vogais cardinais /i/ /u/ /ɔ/ /a/
+const QUAD = [
+  VOWELS.find(v => v.label === '/i/'),
+  VOWELS.find(v => v.label === '/u/'),
+  VOWELS.find(v => v.label === '/ɔ/'),
+  VOWELS.find(v => v.label === '/a/'),
+];
+
+const btns = document.getElementById('vowel-btns');
+VOWELS.forEach(v => {
+  const b = document.createElement('button');
+  b.className = 'vbtn';
+  b.textContent = v.label;
+  b.onclick = () => {
+    document.querySelectorAll('.vbtn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    setFormants(v);
+  };
+  btns.appendChild(b);
+});
+
+function setFormants(v) {
+  ['f1','f2','f3','bw1','bw2','bw3'].forEach(k => {
+    const el = document.getElementById(k);
+    if (el) { el.value = v[k]; updateLabel(k); }
+  });
+  drawVowelSpace();
+  if (playing) restartAudio();
+}
+
+function updateLabel(id) {
+  const el = document.getElementById(id);
+  const out = document.getElementById(id + '-val');
+  if (!out || !el) return;
+  const v = +el.value;
+  if (id === 'jitter') out.textContent = v.toFixed(1) + '%';
+  else if (id === 'shimmer') out.textContent = v.toFixed(1) + '%';
+  else if (id === 'noise') out.textContent = v + '%';
+  else out.textContent = v + ' Hz';
+}
+
+['f0','f1','f2','f3','bw1','bw2','bw3','jitter','shimmer','noise'].forEach(id => {
+  const el = document.getElementById(id);
+  el.oninput = () => {
+    updateLabel(id);
+    document.querySelectorAll('.vbtn').forEach(x => x.classList.remove('active'));
+    if (id === 'f1' || id === 'f2') drawVowelSpace();
+    if (playing) restartAudio();
+  };
+  updateLabel(id);
+});
+
+// ---------- canvas helpers ----------
+const F2MIN = 600, F2MAX = 2600, F1MIN = 250, F1MAX = 900;
+const PAD = { top: 16, bottom: 46, left: 38, right: 14 };
+
+function toXY(f2, f1, W, H) {
+  const PW = W - PAD.left - PAD.right;
+  const PH = H - PAD.top - PAD.bottom;
+  return [
+    PAD.left + (f2 - F2MIN) / (F2MAX - F2MIN) * PW,
+    PAD.top  + (1 - (f1 - F1MIN) / (F1MAX - F1MIN)) * PH
+  ];
+}
+
+function fromXY(x, y, W, H) {
+  const PW = W - PAD.left - PAD.right;
+  const PH = H - PAD.top - PAD.bottom;
+  const f2 = Math.round(((x - PAD.left) / PW * (F2MAX - F2MIN) + F2MIN) / 10) * 10;
+  const f1 = Math.round(((1 - (y - PAD.top) / PH) * (F1MAX - F1MIN) + F1MIN) / 10) * 10;
+  return [
+    Math.max(F2MIN, Math.min(F2MAX, f2)),
+    Math.max(F1MIN, Math.min(F1MAX, f1))
+  ];
+}
+
+function resizeCanvas(c) {
+  const r = c.getBoundingClientRect();
+  const w = Math.round(r.width) || 400;
+  const h = Math.round(r.height) || 200;
+  if (c.width !== w) c.width = w;
+  if (c.height !== h) c.height = h;
+}
+
+// ---------- click / drag on vowel space ----------
+const vsCanvas = document.getElementById('vowel-space');
+
+function handleVSInteraction(e) {
+  const r = vsCanvas.getBoundingClientRect();
+  const scaleX = vsCanvas.width / r.width;
+  const scaleY = vsCanvas.height / r.height;
+  const cx = (e.clientX - r.left) * scaleX;
+  const cy = (e.clientY - r.top)  * scaleY;
+  if (cx < PAD.left || cx > vsCanvas.width - PAD.right ||
+      cy < PAD.top  || cy > vsCanvas.height - PAD.bottom) return;
+  const [f2, f1] = fromXY(cx, cy, vsCanvas.width, vsCanvas.height);
+  document.getElementById('f1').value = f1; updateLabel('f1');
+  document.getElementById('f2').value = f2; updateLabel('f2');
+  document.querySelectorAll('.vbtn').forEach(x => x.classList.remove('active'));
+  drawVowelSpace();
+  if (playing) restartAudio();
+}
+
+let dragging = false;
+vsCanvas.addEventListener('mousedown', e => { dragging = true; handleVSInteraction(e); });
+vsCanvas.addEventListener('mousemove', e => { if (dragging) handleVSInteraction(e); });
+window.addEventListener('mouseup', () => { dragging = false; });
+vsCanvas.addEventListener('touchstart', e => { e.preventDefault(); handleVSInteraction(e.touches[0]); }, { passive: false });
+vsCanvas.addEventListener('touchmove',  e => { e.preventDefault(); handleVSInteraction(e.touches[0]); }, { passive: false });
+
+// ---------- draw vowel space ----------
+function drawVowelSpace() {
+  resizeCanvas(vsCanvas);
+  const ctx = vsCanvas.getContext('2d');
+  const W = vsCanvas.width, H = vsCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const gridCol   = 'rgba(255,255,255,0.06)';
+  const textCol   = 'rgba(255,255,255,0.30)';
+  const axisCol   = 'rgba(255,255,255,0.45)';
+  const quadFill  = 'rgba(127,119,221,0.09)';
+  const quadLine  = 'rgba(127,119,221,0.35)';
+  const dotFill   = '#2a2840';
+  const dotStroke = '#afa9ec';
+  const dotText   = '#cecbf6';
+
+  ctx.font = '9px IBM Plex Mono, monospace';
+
+  // grid lines + tick labels
+  ctx.strokeStyle = gridCol; ctx.lineWidth = 0.5;
+  [700,900,1100,1300,1500,1700,1900,2100,2300,2500].forEach(f => {
+    const x = toXY(f, 500, W, H)[0];
+    if (x < PAD.left || x > W - PAD.right) return;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, H - PAD.bottom); ctx.stroke();
+    ctx.fillStyle = textCol; ctx.textAlign = 'center';
+    ctx.fillText(f, x, H - PAD.bottom + 11);
+  });
+  [300,400,500,600,700,800].forEach(f => {
+    const y = toXY(800, f, W, H)[1];
+    if (y < PAD.top || y > H - PAD.bottom) return;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.fillStyle = textCol; ctx.textAlign = 'right';
+    ctx.fillText(f, PAD.left - 4, y + 3);
+  });
+
+  // axis labels
+  ctx.fillStyle = axisCol;
+  ctx.font = '11px IBM Plex Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('F2 (Hz)', PAD.left + (W - PAD.left - PAD.right) / 2, H - 2);
+  ctx.save();
+  ctx.translate(11, PAD.top + (H - PAD.top - PAD.bottom) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillText('F1 (Hz)', 0, 0);
+  ctx.restore();
+
+  // quadrilateral: vertices at exact vowel positions
+  const qpts = QUAD.map(v => toXY(v.f2, v.f1, W, H));
+  ctx.beginPath();
+  ctx.moveTo(qpts[0][0], qpts[0][1]);
+  qpts.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+  ctx.closePath();
+  ctx.fillStyle = quadFill; ctx.fill();
+  ctx.strokeStyle = quadLine; ctx.lineWidth = 1.2;
+  ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+  // vowel circles
+  ctx.font = '12px IBM Plex Mono, monospace';
+  VOWELS.forEach(v => {
+    const [x, y] = toXY(v.f2, v.f1, W, H);
+    ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2);
+    ctx.fillStyle = dotFill; ctx.fill();
+    ctx.strokeStyle = dotStroke; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = dotText;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(v.label, x, y);
+  });
+
+  // current position (red dot)
+  const cf1 = +document.getElementById('f1').value;
+  const cf2 = +document.getElementById('f2').value;
+  const [cx, cy] = toXY(cf2, cf1, W, H);
+  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#d85a30'; ctx.fill();
+  ctx.strokeStyle = '#993c1d'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.textBaseline = 'alphabetic';
+}
+
+// ---------- audio ----------
+let audioCtx = null, playing = false, _analyser = null;
+
+function getParams() {
+  return {
+    f0: +document.getElementById('f0').value,
+    f1: +document.getElementById('f1').value,
+    f2: +document.getElementById('f2').value,
+    f3: +document.getElementById('f3').value,
+    bw1: +document.getElementById('bw1').value,
+    bw2: +document.getElementById('bw2').value,
+    bw3: +document.getElementById('bw3').value,
+    jitter:  +document.getElementById('jitter').value  / 100,
+    shimmer: +document.getElementById('shimmer').value / 100,
+    noise:   +document.getElementById('noise').value   / 100,
+  };
+}
+
+function buildPulseBuffer(ctx, p) {
+  const sr = ctx.sampleRate, dur = 0.05;
+  const n = Math.floor(sr * dur);
+  const buf = ctx.createBuffer(1, n, sr);
+  const data = buf.getChannelData(0);
+  const period = sr / p.f0;
+  let amp = 1.0;
+  for (let i = 0; i < n; i++) {
+    const jit = 1 + (Math.random() * 2 - 1) * p.jitter * 0.3;
+    const phase = (i / (period * jit)) % 1;
+    amp *= (1 + (Math.random() * 2 - 1) * p.shimmer * 0.05);
+    amp = Math.max(0.3, Math.min(1.7, amp));
+    const pulse = phase < 0.1 ? (1 - phase / 0.1) * amp : 0;
+    const nz = (Math.random() * 2 - 1) * p.noise;
+    data[i] = pulse * (1 - p.noise) + nz;
+  }
+  return buf;
+}
+
+function startAudio() {
+  audioCtx = new AudioContext();
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.8;
+  _analyser = analyser;
+
+  const p = getParams();
+  const f1n = audioCtx.createBiquadFilter(); f1n.type = 'bandpass'; f1n.frequency.value = p.f1; f1n.Q.value = p.f1 / p.bw1;
+  const f2n = audioCtx.createBiquadFilter(); f2n.type = 'bandpass'; f2n.frequency.value = p.f2; f2n.Q.value = p.f2 / p.bw2;
+  const f3n = audioCtx.createBiquadFilter(); f3n.type = 'bandpass'; f3n.frequency.value = p.f3; f3n.Q.value = p.f3 / p.bw3;
+  const gain = audioCtx.createGain(); gain.gain.value = 0.6;
+
+  function scheduleChunk() {
+    if (!playing) return;
+    const buf = buildPulseBuffer(audioCtx, getParams());
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(f1n); src.connect(f2n); src.connect(f3n);
+    f1n.connect(gain); f2n.connect(gain); f3n.connect(gain);
+    gain.connect(analyser); analyser.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+    src.start(now); src.stop(now + 0.05);
+    src.onended = scheduleChunk;
+  }
+  playing = true;
+  scheduleChunk();
+  drawSpectrum();
+}
+
+function stopAudio() {
+  playing = false;
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  _analyser = null;
+}
+
+function restartAudio() { stopAudio(); startAudio(); }
+
+const playBtn = document.getElementById('play-btn');
+playBtn.onclick = () => {
+  if (!playing) {
+    startAudio();
+    playBtn.classList.add('playing');
+    document.getElementById('play-icon').innerHTML =
+      '<svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor"><rect x="0" y="0" width="4" height="14"/><rect x="8" y="0" width="4" height="14"/></svg>';
+    document.getElementById('play-label').textContent = 'parar';
+  } else {
+    stopAudio();
+    playBtn.classList.remove('playing');
+    document.getElementById('play-icon').innerHTML =
+      '<svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor"><polygon points="0,0 12,7 0,14"/></svg>';
+    document.getElementById('play-label').textContent = 'tocar';
+  }
+};
+
+// ---------- spectrum ----------
+const specCanvas = document.getElementById('spectrum');
+const specCtx = specCanvas.getContext('2d');
+
+function drawSpectrum() {
+  if (!_analyser) { specCtx.clearRect(0, 0, specCanvas.width, specCanvas.height); return; }
+  requestAnimationFrame(drawSpectrum);
+  resizeCanvas(specCanvas);
+  const W = specCanvas.width, H = specCanvas.height;
+  const data = new Uint8Array(_analyser.frequencyBinCount);
+  _analyser.getByteFrequencyData(data);
+  specCtx.clearRect(0, 0, W, H);
+
+  const maxFreq = 5000, sr = _analyser.context.sampleRate;
+  const binHz = sr / _analyser.fftSize;
+  const maxBin = Math.floor(maxFreq / binHz);
+
+  specCtx.fillStyle = 'rgba(127,119,221,0.20)';
+  for (let i = 0; i < maxBin; i++) {
+    const x = (i / maxBin) * W;
+    const y = H - (data[i] / 255) * H;
+    specCtx.fillRect(x, y, W / maxBin + 1, H - y);
+  }
+
+  const p = getParams();
+  [[p.f1,'#7f77dd'],[p.f2,'#1d9e75'],[p.f3,'#d85a30']].forEach(([f, c], fi) => {
+    const x = (f / maxFreq) * W;
+    specCtx.strokeStyle = c + 'bb'; specCtx.lineWidth = 1;
+    specCtx.setLineDash([3, 3]);
+    specCtx.beginPath(); specCtx.moveTo(x, 0); specCtx.lineTo(x, H); specCtx.stroke();
+    specCtx.setLineDash([]);
+    specCtx.fillStyle = c;
+    specCtx.font = '10px IBM Plex Mono, monospace';
+    specCtx.fillText(['F1','F2','F3'][fi], x + 3, 12);
+  });
+
+  specCtx.strokeStyle = 'rgba(255,255,255,0.05)'; specCtx.lineWidth = 0.5;
+  [500,1000,2000,3000,4000].forEach(f => {
+    const x = (f / maxFreq) * W;
+    specCtx.beginPath(); specCtx.moveTo(x, 0); specCtx.lineTo(x, H); specCtx.stroke();
+    specCtx.fillStyle = 'rgba(255,255,255,0.22)';
+    specCtx.font = '9px IBM Plex Mono, monospace';
+    specCtx.fillText(f + 'Hz', x + 2, H - 3);
+  });
+}
+
+// ---------- init ----------
+setTimeout(() => {
+  resizeCanvas(vsCanvas);    drawVowelSpace();
+  resizeCanvas(specCanvas);
+}, 150);
+
+window.addEventListener('resize', () => { drawVowelSpace(); });
+</script>
+</body>
+</html>
